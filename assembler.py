@@ -1,3 +1,8 @@
+"""
+Created on Thu Dec 24 02:08:08 2020
+
+@author: Lamiaa Samir
+"""
 class Assembler(object):
     def __init__(self, asmpath='', mripath='', rripath='', ioipath='') -> None:
         """
@@ -141,9 +146,29 @@ class Assembler(object):
         self.__address_symbol_table. The location must be in binary (not hex or dec).
         Returns None
         """
-        pass
-
-
+        
+        LC = int('0', 16)
+        pseudo_table = ['org', 'end', 'hex', 'dec']
+        valid_instr =  list(self.__ioi_table.keys()) + list(self.__rri_table.keys()) + list(self.__mri_table.keys()) + pseudo_table
+        for i in range(len(self.__asm)):
+            field = self.__asm[i][0]
+            if (field not in valid_instr) and (not self.__islabel(field)):
+                raise Exception("Erroneous input at line: {}".format(i + 1))
+             #if the scanned field is a label it is added to the dictinary symbol table 
+             #at the key determined by the current value of LC... LC is then incremented
+            if self.__islabel(field):
+                self.__address_symbol_table[field] = LC
+                LC += 1
+            else:
+                #if the scanned field is "org", it identifies the LC of the next line 
+                #of the assembly code so LC is set to the identified value
+                if field == "org":
+                    LC = int(self.__asm[i][-1], 16)
+                elif field == "end":
+                    return
+                else:
+                    LC += int('1', 16)
+            
 
     def __second_pass(self) -> None:
         """
@@ -153,4 +178,50 @@ class Assembler(object):
         also store the translated instruction's binary representation alongside its 
         location (in binary too) in self.__bin.
         """
-        pass
+        
+        pseudo_table = ['org', 'end', 'hex', 'dec']
+        LC = int('0', 16)
+        for i in range(len(self.__asm)):
+            if self.__asm[i][0] not in self.__address_symbol_table.keys():
+                instrIndex = 0 
+            else:
+                instrIndex = 1
+            LC_add = str(self.__format2bin(str(LC), 'dec', 12))
+            Instr = self.__asm[i][instrIndex]
+            if Instr in pseudo_table:
+                if Instr == 'org':
+                    LC = int(self.__asm[i][-1], 16)
+                elif Instr == 'end':
+                    return
+                elif Instr == 'dec':
+                    self.__bin[LC_add] = str(self.__format2bin(self.__asm[i][-1], 'dec', 16))
+                    LC += 1
+                else:
+                    self.__bin[LC_add] = str(self.__format2bin(self.__asm[i][-1], 'hex', 16))
+                    LC += 1
+            
+            elif Instr in self.__rri_table.keys():
+                self.__bin[LC_add] = str(self.__rri_table[Instr])
+                LC += 1
+                pass
+            elif Instr in self.__ioi_table.keys():
+                self.__bin[LC_add] = str(self.__ioi_table[Instr])
+                LC += 1
+            elif Instr in self.__mri_table.keys():
+                opcode = str(self.__mri_table[Instr])
+                I = '0'
+                eff_LC = self.__asm[i][-1]
+                if eff_LC == "I":
+                    I = "1"
+                    eff_LC = self.__asm[i][-2]
+                if eff_LC+',' in self.__address_symbol_table:
+                    location = self.__address_symbol_table[eff_LC+',']
+                    self.__bin[LC_add] = I + opcode + str(self.__format2bin(str(location), "dec", 12))
+                else:
+                    location = eff_LC
+                    self.__bin[LC_add] = I + opcode + str(self.__format2bin(str(location), "hex", 12))
+                LC += 1
+                pass
+            
+            else:
+                raise Exception("Erroneous or Unsupported Instruction! Please, check your inputs and try again")
